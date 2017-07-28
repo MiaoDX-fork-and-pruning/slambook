@@ -83,8 +83,8 @@ public:
         _jacobianOplusXi(2,5) = -1;
     }
 
-    bool read ( istream& in ) {}
-    bool write ( ostream& out ) const {}
+	bool read(istream& in) { return false; }
+	bool write(ostream& out) const { return false; }
 protected:
     Eigen::Vector3d _point;
 };
