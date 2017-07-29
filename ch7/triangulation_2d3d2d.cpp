@@ -15,10 +15,20 @@
 #include <g2o/types/sba/types_six_dof_expmap.h>
 #include <chrono>
 
+#include <numeric>      // std::iota
+#include <random>       // std::default_random_engine
+#include <map> 
+
 using namespace std;
 using namespace cv;
 
 void find_feature_matches (
+    const Mat& img_1, const Mat& img_2,
+    std::vector<KeyPoint>& keypoints_1,
+    std::vector<KeyPoint>& keypoints_2,
+    std::vector< DMatch >& matches );
+
+void find_feature_matches_from_keypoints (
     const Mat& img_1, const Mat& img_2,
     std::vector<KeyPoint>& keypoints_1,
     std::vector<KeyPoint>& keypoints_2,
@@ -45,12 +55,18 @@ void PNPSolver (
     const Mat& d1
 );
 
-void PNPSolverWith3DPoints (
-    const vector<KeyPoint>& keypoints_1,
-    const vector<KeyPoint>& keypoints_2,
-    const std::vector< DMatch >& matches,
-    const vector<Point3d>& points
+void corruptPoints (
+    const vector<KeyPoint>& keypoint,
+    const vector<Point3d>& points3d,
+    vector<KeyPoint>& corruptKeypoint,
+    vector<Point3d>& corruptPoints3d
 );
+
+
+void PNPSolver_img2_matched_and_3DPoints (
+    const vector<Point2d>& points_img2,
+    const vector<Point3d>& points_3d,
+    const Mat& K );
 
 void bundleAdjustment (
     const vector<Point3d> points_3d,
@@ -58,6 +74,14 @@ void bundleAdjustment (
     const Mat& K,
     Mat& R, Mat& t
 );
+
+void DebugMatchedKeyPoints (
+    const Mat& img_1, const Mat& img_2,
+    const std::vector<KeyPoint>& keypoints_1,
+    const std::vector<KeyPoint>& keypoints_2,
+    const std::vector< DMatch >& matches
+);
+
 
 // 像素坐标转相机归一化坐标
 Point2f pixel2cam ( const Point2d& p, const Mat& K );
@@ -73,15 +97,18 @@ int main ( int argc, char** argv )
     Mat img_1 = imread ( argv[1], CV_LOAD_IMAGE_COLOR );
     Mat img_2 = imread ( argv[2], CV_LOAD_IMAGE_COLOR );
 
-    vector<KeyPoint> keypoints_1, keypoints_2;
+    Mat K = (Mat_<double> ( 3, 3 ) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
+
+    vector<KeyPoint> keypoints_1_all, keypoints_2_all;
     vector<DMatch> matches;
-    find_feature_matches ( img_1, img_2, keypoints_1, keypoints_2, matches );
-    // cout<<"一共找到了"<<matches.size() <<"组匹配点"<<endl;
+    find_feature_matches ( img_1, img_2, keypoints_1_all, keypoints_2_all, matches );
     cout << "We found " << matches.size () << " pairs of points in total" << endl;
+    // DebugMatchedKeyPoints ( img_1, img_2, keypoints_1_all, keypoints_2_all, matches );
+
 
     //-- 估计两张图像间运动
     Mat R, t;
-    pose_estimation_2d2d ( keypoints_1, keypoints_2, matches, R, t );
+    pose_estimation_2d2d ( keypoints_1_all, keypoints_2_all, matches, R, t );
     /*
     // Resign the t vector, according to the physics world
     if (signbit(t.at<double>(0, 0))) { // negative
@@ -96,41 +123,42 @@ int main ( int argc, char** argv )
     */
 
     //-- 三角化
-    vector<Point3d> points;
-    triangulation ( keypoints_1, keypoints_2, matches, R, t, points );
+    vector<Point3d> points_3d_matched;
+    triangulation ( keypoints_1_all, keypoints_2_all, matches, R, t, points_3d_matched );
 
-    /*
-    //-- 验证三角化点与特征点的重投影关系
-    Mat K = ( Mat_<double> ( 3,3 ) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1 );
-    // for ( int i=0; i<matches.size(); i++ )
-    for (int i = 0; i< 2; i++)
-    {
-        Point2d pt1_cam = pixel2cam( keypoints_1[ matches[i].queryIdx ].pt, K );
-        Point2d pt1_cam_3d(
-            points[i].x/points[i].z,
-            points[i].y/points[i].z
-        );
-
-        cout<<"point in the first camera frame: "<<pt1_cam<<endl;
-        cout<<"point projected from 3D "<<pt1_cam_3d<<", d="<<points[i].z<<endl;
-
-        // 第二个图
-        Point2f pt2_cam = pixel2cam( keypoints_2[ matches[i].trainIdx ].pt, K );
-        Mat pt2_trans = R*( Mat_<double>(3,1) << points[i].x, points[i].y, points[i].z ) + t;
-        pt2_trans /= pt2_trans.at<double>(2,0);
-        cout<<"point in the second camera frame: "<<pt2_cam<<endl;
-        cout<<"point reprojected from second frame: "<<pt2_trans.t()<<endl;
-        cout<<endl;
-    }
-    */
-
-
+    
     // 建立3D点
     Mat d1 = imread ( argv[3], CV_LOAD_IMAGE_UNCHANGED );       // 深度图为16位无符号数，单通道图像
-    PNPSolver ( keypoints_1, keypoints_2, matches, d1 );
+    PNPSolver ( keypoints_1_all, keypoints_2_all, matches, d1 );
 
-    PNPSolverWith3DPoints ( keypoints_1, keypoints_2, matches, points );
+    vector<Point2d> points_im2_matched;
+    for ( DMatch m : matches ) {
+        points_im2_matched.push_back ( keypoints_2_all[m.trainIdx].pt ); // no need to convert to camera coordinate
+    }
+    PNPSolver_img2_matched_and_3DPoints ( points_im2_matched, points_3d_matched, K );
 
+    // Remove some of the chosen key points and 3d points pairs, to simulate manipulation on them
+    vector<KeyPoint> im1_corruptKeypoint;
+    vector<Point3d> corruptPoints3d;
+    vector<KeyPoint> keypoint_1_matched;
+    for ( DMatch m : matches ) {
+        keypoint_1_matched.push_back ( keypoints_1_all[m.queryIdx] );
+    }  
+    corruptPoints ( keypoint_1_matched, points_3d_matched, im1_corruptKeypoint, corruptPoints3d );
+
+    vector<DMatch> matchesAfterCorrupt;
+    find_feature_matches_from_keypoints ( img_1, img_2, im1_corruptKeypoint, keypoints_2_all, matchesAfterCorrupt );
+    DebugMatchedKeyPoints ( img_1, img_2, im1_corruptKeypoint, keypoints_2_all, matchesAfterCorrupt );
+    
+    vector<Point3d> points_3d_corrupted_and_mathced;
+    vector<Point2d> points_im2_corrupted_and_mathced;
+    for ( DMatch m : matchesAfterCorrupt )
+    {
+        points_3d_corrupted_and_mathced.push_back ( corruptPoints3d[m.queryIdx] );
+        points_im2_corrupted_and_mathced.push_back ( keypoints_2_all[m.trainIdx].pt );
+    }
+    
+    PNPSolver_img2_matched_and_3DPoints ( points_im2_corrupted_and_mathced, points_3d_corrupted_and_mathced, K );
 
     system ( "pause" );
 
@@ -146,14 +174,29 @@ void find_feature_matches ( const Mat& img_1, const Mat& img_2,
     Mat descriptors_1, descriptors_2;
     // used in OpenCV3 
     Ptr<FeatureDetector> detector = ORB::create ();
+    //-- 第一步:检测 Oriented FAST 角点位置
+    detector->detect ( img_1, keypoints_1 );
+    detector->detect ( img_2, keypoints_2 );
+
+    find_feature_matches_from_keypoints ( img_1, img_2, keypoints_1, keypoints_2, matches );
+}
+
+
+
+void find_feature_matches_from_keypoints (
+    const Mat& img_1, const Mat& img_2,
+    std::vector<KeyPoint>& keypoints_1,
+    std::vector<KeyPoint>& keypoints_2,
+    std::vector< DMatch >& matches )
+{
+    //-- 初始化
+    Mat descriptors_1, descriptors_2;
+    // used in OpenCV3 
     Ptr<DescriptorExtractor> descriptor = ORB::create ();
     // use this if you are in OpenCV2 
     // Ptr<FeatureDetector> detector = FeatureDetector::create ( "ORB" );
     // Ptr<DescriptorExtractor> descriptor = DescriptorExtractor::create ( "ORB" );
     Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create ( "BruteForce-Hamming" );
-    //-- 第一步:检测 Oriented FAST 角点位置
-    detector->detect ( img_1, keypoints_1 );
-    detector->detect ( img_2, keypoints_2 );
 
     //-- 第二步:根据角点位置计算 BRIEF 描述子
     descriptor->compute ( img_1, keypoints_1, descriptors_1 );
@@ -187,6 +230,47 @@ void find_feature_matches ( const Mat& img_1, const Mat& img_2,
         }
     }
 }
+
+
+void DebugMatchedKeyPoints (
+    const Mat& img_1, const Mat& img_2,
+    const std::vector<KeyPoint>& keypoints_1,
+    const std::vector<KeyPoint>& keypoints_2,
+    const std::vector< DMatch >& matches
+)
+{
+    std::vector<KeyPoint> keypoints_1_matched;
+    std::vector<KeyPoint> keypoints_2_matched;
+    std::vector<Point2d> points_1_matched;
+    std::vector<Point2d> points_2_matched;
+
+    /* Debug */
+    cout << "Output all matched keypoints and corresponding matches and their distance" << endl;
+    for ( DMatch m : matches ) {
+        keypoints_1_matched.push_back ( keypoints_1[m.queryIdx] );
+        points_1_matched.push_back ( keypoints_1[m.queryIdx].pt );
+        
+        keypoints_2_matched.push_back ( keypoints_2[m.trainIdx] );
+        points_2_matched.push_back ( keypoints_2[m.trainIdx].pt );
+    }
+
+    //-- Draw the descriptors
+    Mat outimg1, outimg2;
+    drawKeypoints ( img_1, keypoints_1, outimg1, Scalar::all ( -1 ), DrawMatchesFlags::DEFAULT );
+    drawKeypoints ( img_2, keypoints_2, outimg2, Scalar::all ( -1 ), DrawMatchesFlags::DEFAULT );
+    imshow ( "Descriptors on im1", outimg1 );
+    imshow ( "Descriptors on im2", outimg2 );
+
+    //-- 第五步:绘制匹配结果
+    Mat img_match;
+    Mat img_goodmatch;
+    drawMatches ( img_1, keypoints_1, img_2, keypoints_2, matches, img_match );
+    printf ( "-- All match num : %I64u \n", matches.size () );
+    imshow ( "All matched points", img_match );
+    waitKey ( 0 );
+
+}
+
 
 void pose_estimation_2d2d (
     const std::vector<KeyPoint>& keypoints_1,
@@ -272,6 +356,30 @@ void triangulation (
         points.push_back ( p );
     }
 
+    /*
+    //-- 验证三角化点与特征点的重投影关系
+    // for ( int i=0; i<matches.size(); i++ )
+    for (int i = 0; i< 2; i++)
+    {
+    Point2d pt1_cam = pixel2cam( keypoints_1[ matches[i].queryIdx ].pt, K );
+    Point2d pt1_cam_3d(
+    points[i].x/points[i].z,
+    points[i].y/points[i].z
+    );
+
+    cout<<"point in the first camera frame: "<<pt1_cam<<endl;
+    cout<<"point projected from 3D "<<pt1_cam_3d<<", d="<<points[i].z<<endl;
+
+    // 第二个图
+    Point2f pt2_cam = pixel2cam( keypoints_2[ matches[i].trainIdx ].pt, K );
+    Mat pt2_trans = R*( Mat_<double>(3,1) << points[i].x, points[i].y, points[i].z ) + t;
+    pt2_trans /= pt2_trans.at<double>(2,0);
+    cout<<"point in the second camera frame: "<<pt2_cam<<endl;
+    cout<<"point reprojected from second frame: "<<pt2_trans.t()<<endl;
+    cout<<endl;
+    }
+    */
+
 }
 
 Point2f pixel2cam ( const Point2d& p, const Mat& K )
@@ -327,33 +435,23 @@ void PNPSolver (
 
 }
 
-void PNPSolverWith3DPoints (
-    const vector<KeyPoint>& keypoints_1,
-    const vector<KeyPoint>& keypoints_2,
-    const std::vector< DMatch >& matches,
-    const vector<Point3d>& points
+
+
+
+void PNPSolver_img2_matched_and_3DPoints (
+    const vector<Point2d>& points_img2,
+    const vector<Point3d>& points_3d,
+    const Mat& K
 )
 {
-    Mat K = (Mat_<double> ( 3, 3 ) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
-    //vector<Point3f> pts_3d;
-    //vector<Point2f> pts_2d;
+    // Mat K = (Mat_<double> ( 3, 3 ) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
 
-    vector<Point2d> pts_1, pts_2;
-    for ( DMatch m : matches )
-    {
-        pts_2.push_back ( keypoints_2[m.trainIdx].pt ); // seems not the camera coordinate 
-    }
-    /*
-    cout << "pts_3d" << endl;
-    for (auto p : points) {
-        cout << p.x << " " << p.y << " " << p.z << endl;
-    }
-    */
+    assert ( points_img2.size () == points_3d.size () );
 
-    cout << "3d-2d pairs: " << points.size () << endl;
+    cout << "3d-2d pairs: " << points_3d.size () << endl;
 
     Mat r, t;
-    solvePnP ( points, pts_2, K, Mat (), r, t, false );
+    solvePnP ( points_3d, points_img2, K, Mat (), r, t, false );
 
     Mat R;
     cv::Rodrigues ( r, R ); // r为旋转向量形式，用Rodrigues公式转换为矩阵
@@ -364,9 +462,8 @@ void PNPSolverWith3DPoints (
 
     cout << "calling bundle adjustment" << endl;
 
-    bundleAdjustment ( points, pts_2, K, R, t );
+    bundleAdjustment ( points_3d, points_img2, K, R, t );
 }
-
 
 
 void bundleAdjustment (
@@ -440,4 +537,25 @@ void bundleAdjustment (
     cout << endl << "after optimization:" << endl;
     cout << "T=" << endl << Eigen::Isometry3d ( pose->estimate () ).matrix () << endl;
 
+}
+
+void corruptPoints (
+    const vector<KeyPoint>& keypoint,
+    const vector<Point3d>& points3d,
+    vector<KeyPoint>& corruptKeypoint,
+    vector<Point3d>& corruptPoints3d
+)
+{
+    assert ( keypoint.size () == points3d.size () ); // assert will do nothing for release
+
+    float corrupt_ratio = 0.5;
+
+    std::vector<int> indexes ( keypoint.size(), 0 );
+    std::iota ( indexes.begin (), indexes.end (), 0 );
+    shuffle ( indexes.begin (), indexes.end (), std::default_random_engine ( 42 ) );
+
+    for ( int i = 0; i < (int)(points3d.size () * corrupt_ratio); i++ ) {
+        corruptKeypoint.push_back ( keypoint[i] );
+        corruptPoints3d.push_back ( points3d[i] );
+    }
 }
