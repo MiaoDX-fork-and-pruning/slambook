@@ -67,6 +67,12 @@ target_link_libraries( pose_estimation_2d2d ${OpenCV_LIBS} )
 add_executable( triangulation triangulation.cpp )
 target_link_libraries( triangulation ${OpenCV_LIBS} )
 
+add_executable( triangulation_2d3d2d triangulation_2d3d2d.cpp )
+target_link_libraries( triangulation_2d3d2d 
+   ${OpenCV_LIBS}   
+   #${CSPARSE_LIBRARY}
+   ${G2O_LIBS}
+) 
 add_executable( pose_estimation_3d2d pose_estimation_3d2d.cpp )
 target_link_libraries( pose_estimation_3d2d 
    ${OpenCV_LIBS}
