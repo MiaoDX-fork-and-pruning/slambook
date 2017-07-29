@@ -46,7 +46,8 @@ int main ( int argc, char** argv )
     vector<KeyPoint> keypoints_1, keypoints_2;
     vector<DMatch> matches;
     find_feature_matches ( img_1, img_2, keypoints_1, keypoints_2, matches );
-    cout<<"一共找到了"<<matches.size() <<"组匹配点"<<endl;
+    //cout<<"一共找到了"<<matches.size() <<"组匹配点"<<endl;
+	cout << "We found " << matches.size() << " pairs of points in total" << endl;
 
     // 建立3D点
     Mat d1 = imread ( argv[3], CV_LOAD_IMAGE_UNCHANGED );       // 深度图为16位无符号数，单通道图像
@@ -77,6 +78,8 @@ int main ( int argc, char** argv )
     cout<<"calling bundle adjustment"<<endl;
 
     bundleAdjustment ( pts_3d, pts_2d, K, R, t );
+
+	system("pause");
 }
 
 void find_feature_matches ( const Mat& img_1, const Mat& img_2,

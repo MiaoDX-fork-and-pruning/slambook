@@ -18,9 +18,9 @@ void find_feature_matches (
     std::vector< DMatch >& matches );
 
 void pose_estimation_2d2d (
-    std::vector<KeyPoint> keypoints_1,
-    std::vector<KeyPoint> keypoints_2,
-    std::vector< DMatch > matches,
+    const std::vector<KeyPoint> keypoints_1,
+    const std::vector<KeyPoint> keypoints_2,
+    const std::vector< DMatch > matches,
     Mat& R, Mat& t );
 
 // 像素坐标转相机归一化坐标
@@ -40,8 +40,9 @@ int main ( int argc, char** argv )
     vector<KeyPoint> keypoints_1, keypoints_2;
     vector<DMatch> matches;
     find_feature_matches ( img_1, img_2, keypoints_1, keypoints_2, matches );
-    cout<<"一共找到了"<<matches.size() <<"组匹配点"<<endl;
-
+    // cout<<"一共找到了"<<matches.size() <<"组匹配点"<<endl;
+	cout << "We found " << matches.size() << " pairs of points in total" << endl;
+	
     //-- 估计两张图像间运动
     Mat R,t;
     pose_estimation_2d2d ( keypoints_1, keypoints_2, matches, R, t );
@@ -65,6 +66,9 @@ int main ( int argc, char** argv )
         Mat d = y2.t() * t_x * R * y1;
         cout << "epipolar constraint = " << d << endl;
     }
+	
+	system("pause");
+
     return 0;
 }
 
@@ -130,9 +134,9 @@ Point2d pixel2cam ( const Point2d& p, const Mat& K )
 }
 
 
-void pose_estimation_2d2d ( std::vector<KeyPoint> keypoints_1,
-                            std::vector<KeyPoint> keypoints_2,
-                            std::vector< DMatch > matches,
+void pose_estimation_2d2d ( const std::vector<KeyPoint> keypoints_1,
+                            const std::vector<KeyPoint> keypoints_2,
+                            const std::vector< DMatch > matches,
                             Mat& R, Mat& t )
 {
     // 相机内参,TUM Freiburg2
