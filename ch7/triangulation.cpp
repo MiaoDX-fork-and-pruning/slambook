@@ -49,7 +49,18 @@ int main ( int argc, char** argv )
     //-- 估计两张图像间运动
     Mat R,t;
     pose_estimation_2d2d ( keypoints_1, keypoints_2, matches, R, t );
-
+    
+    /*
+    // The triangulation is invariant to the scale of t vector
+    if ( signbit ( t.at<double> ( 0, 0 ) ) ) { // negative
+        t *= -10.0 / t.at<double> ( 0, 0 ); // We can assign the absolute valuse of the t, and then the calculated points will have absolute dimension
+    }
+    else
+    {
+        t *= 10.0 / t.at<double> ( 0, 0 );
+    }
+    */
+    cout << "Covered t is " << endl << t << endl;
     //-- 三角化
     vector<Point3d> points;
     triangulation( keypoints_1, keypoints_2, matches, R, t, points );
@@ -75,6 +86,8 @@ int main ( int argc, char** argv )
         cout<<"point reprojected from second frame: "<<pt2_trans.t()<<endl;
         cout<<endl;
     }
+
+    system( "pause" );
     
     return 0;
 }
