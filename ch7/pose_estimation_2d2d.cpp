@@ -164,6 +164,9 @@ void pose_estimation_2d2d ( const std::vector<KeyPoint> keypoints_1,
     essential_matrix = findEssentialMat ( points1, points2, focal_length, principal_point );
     cout<<"essential_matrix is "<<endl<< essential_matrix<<endl;
 
+	//Mat essential_matrix2 = findEssentialMat ( points1, points2, K );
+	//cout << "essential_matrix2 is " << endl << essential_matrix << endl;
+
     //-- 计算单应矩阵
     Mat homography_matrix;
     homography_matrix = findHomography ( points1, points2, RANSAC, 3 );

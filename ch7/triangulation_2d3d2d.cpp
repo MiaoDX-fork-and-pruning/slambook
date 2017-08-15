@@ -83,6 +83,15 @@ void DebugMatchedKeyPoints (
 );
 
 
+// [Copy from SFM](https://github.com/opencv/opencv_contrib/blob/master/modules/sfm/src/fundamental.cpp)
+void essentialFromFundamental ( const Mat &F,
+	const Mat &K1,
+	const Mat &K2,
+	Mat& E )
+{
+	E = K2.t () * F * K1;
+}
+
 // 像素坐标转相机归一化坐标
 Point2f pixel2cam ( const Point2d& p, const Mat& K );
 
@@ -102,6 +111,8 @@ int main ( int argc, char** argv )
     vector<KeyPoint> keypoints_1_all, keypoints_2_all;
     vector<DMatch> matches;
     find_feature_matches ( img_1, img_2, keypoints_1_all, keypoints_2_all, matches );
+	cout << "We found " << keypoints_1_all.size () << " key points in im1" << endl;
+	cout << "We found " << keypoints_2_all.size () << " key points in im2" << endl;
     cout << "We found " << matches.size () << " pairs of points in total" << endl;
     // DebugMatchedKeyPoints ( img_1, img_2, keypoints_1_all, keypoints_2_all, matches );
 
@@ -177,6 +188,13 @@ void find_feature_matches ( const Mat& img_1, const Mat& img_2,
     //-- 第一步:检测 Oriented FAST 角点位置
     detector->detect ( img_1, keypoints_1 );
     detector->detect ( img_2, keypoints_2 );
+
+	/*
+	for ( int i = 0; i < 10; i++ ) {
+		Point2d p2 = keypoints_1[i].pt;
+		cout << p2.x << " " << p2.y << endl;
+	}
+	*/
 
     find_feature_matches_from_keypoints ( img_1, img_2, keypoints_1, keypoints_2, matches );
 }
@@ -285,11 +303,22 @@ void pose_estimation_2d2d (
     vector<Point2f> points1;
     vector<Point2f> points2;
 
-    for ( int i = 0; i < (int)matches.size (); i++ )
-    {
-        points1.push_back ( keypoints_1[matches[i].queryIdx].pt );
-        points2.push_back ( keypoints_2[matches[i].trainIdx].pt );
-    }
+
+	for ( auto m : matches )
+	{
+		points1.push_back ( keypoints_1[m.queryIdx].pt );
+		points2.push_back ( keypoints_2[m.trainIdx].pt );
+	}
+
+	/*
+	for ( int i = 0; i < points1.size(); i++ ) {
+		Point2d p1 = points1[i];
+		Point2d p2 = points2[i];
+		cout << "i:" << i << endl;
+		cout << "p1:" << p1.x << " " << p1.y << endl;
+		cout << "p2:" << p2.x << " " << p2.y << endl;
+	}
+	*/
 
     //-- 计算基础矩阵
     Mat fundamental_matrix;
@@ -303,14 +332,28 @@ void pose_estimation_2d2d (
     essential_matrix = findEssentialMat ( points1, points2, focal_length, principal_point );
     cout << "essential_matrix is " << endl << essential_matrix << endl;
 
+	//Mat essential_matrix2 = findEssentialMat ( points1, points2, K );
+	//cout << "essential_matrix2 is " << endl << essential_matrix << endl;
+
+	
+	// -- F -> E
+	Mat essential_matrix3;
+	essentialFromFundamental ( fundamental_matrix, K, K, essential_matrix3 );
+	cout << "essential_matrix3 is " << endl << essential_matrix3 << endl;
+
     //-- 计算单应矩阵
     Mat homography_matrix;
     homography_matrix = findHomography ( points1, points2, RANSAC, 3 );
     cout << "homography_matrix is " << endl << homography_matrix << endl;
 
     //-- 从本质矩阵中恢复旋转和平移信息.
-    recoverPose ( essential_matrix, points1, points2, R, t, focal_length, principal_point );
-    cout << "R is " << endl << R << endl;
+
+	recoverPose ( essential_matrix, points1, points2, R, t, focal_length, principal_point );
+	Mat r;
+	cv::Rodrigues ( R, r ); // r为旋转向量形式，用Rodrigues公式转换为矩阵
+
+	cout << "R=" << endl << R << endl;
+	cout << "r=" << endl << r << endl;
     cout << "t is " << endl << t << endl;
 }
 
