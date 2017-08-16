@@ -38,12 +38,14 @@ void pose_estimation_2d2d (
     const std::vector<KeyPoint>& keypoints_1,
     const std::vector<KeyPoint>& keypoints_2,
     const std::vector< DMatch >& matches,
+	const Mat K,
     Mat& R, Mat& t );
 
 void triangulation (
     const vector<KeyPoint>& keypoint_1,
     const vector<KeyPoint>& keypoint_2,
     const std::vector< DMatch >& matches,
+	const Mat K,
     const Mat& R, const Mat& t,
     vector<Point3d>& points
 );
@@ -52,7 +54,8 @@ void PNPSolver (
     const vector<KeyPoint>& keypoints_1,
     const vector<KeyPoint>& keypoints_2,
     const std::vector< DMatch >& matches,
-    const Mat& d1
+    const Mat& d1,
+	const Mat K
 );
 
 void corruptPoints (
@@ -106,7 +109,10 @@ int main ( int argc, char** argv )
     Mat img_1 = imread ( argv[1], CV_LOAD_IMAGE_COLOR );
     Mat img_2 = imread ( argv[2], CV_LOAD_IMAGE_COLOR );
 
-    Mat K = (Mat_<double> ( 3, 3 ) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
+    //Mat K = (Mat_<double> ( 3, 3 ) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
+	//K = np.array ( [[8607.8639, 0, 2880.72115], [0, 8605.4303, 1913.87935], [0, 0, 1]] ) # Canon5DMarkIII - EF50mm
+	Mat K = (Mat_<double> ( 3, 3 ) << 8607.8639, 0, 2880.72115, 0, 8605.4303, 1913.87935, 0, 0, 1);
+
 
     vector<KeyPoint> keypoints_1_all, keypoints_2_all;
     vector<DMatch> matches;
@@ -119,7 +125,7 @@ int main ( int argc, char** argv )
 
     //-- 估计两张图像间运动
     Mat R, t;
-    pose_estimation_2d2d ( keypoints_1_all, keypoints_2_all, matches, R, t );
+    pose_estimation_2d2d ( keypoints_1_all, keypoints_2_all, matches, K, R, t );
     /*
     // Resign the t vector, according to the physics world
     if (signbit(t.at<double>(0, 0))) { // negative
@@ -135,13 +141,13 @@ int main ( int argc, char** argv )
 
     //-- 三角化
     vector<Point3d> points_3d_matched;
-    triangulation ( keypoints_1_all, keypoints_2_all, matches, R, t, points_3d_matched );
+    triangulation ( keypoints_1_all, keypoints_2_all, matches, K, R, t, points_3d_matched );
 
-    
+    /*
     // 建立3D点
     Mat d1 = imread ( argv[3], CV_LOAD_IMAGE_UNCHANGED );       // 深度图为16位无符号数，单通道图像
-    PNPSolver ( keypoints_1_all, keypoints_2_all, matches, d1 );
-
+    PNPSolver ( keypoints_1_all, keypoints_2_all, matches, d1, K );
+	*/
     vector<Point2d> points_im2_matched;
     for ( DMatch m : matches ) {
         points_im2_matched.push_back ( keypoints_2_all[m.trainIdx].pt ); // no need to convert to camera coordinate
@@ -294,10 +300,11 @@ void pose_estimation_2d2d (
     const std::vector<KeyPoint>& keypoints_1,
     const std::vector<KeyPoint>& keypoints_2,
     const std::vector< DMatch >& matches,
+	const Mat K,
     Mat& R, Mat& t )
 {
     // 相机内参,TUM Freiburg2
-    Mat K = (Mat_<double> ( 3, 3 ) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
+    //Mat K = (Mat_<double> ( 3, 3 ) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
 
     //-- 把匹配点转换为vector<Point2f>的形式
     vector<Point2f> points1;
@@ -325,15 +332,16 @@ void pose_estimation_2d2d (
     fundamental_matrix = findFundamentalMat ( points1, points2, CV_FM_8POINT );
     cout << "fundamental_matrix is " << endl << fundamental_matrix << endl;
 
+	/*
     //-- 计算本质矩阵
     Point2d principal_point ( 325.1, 249.7 );				//相机主点, TUM dataset标定值
     int focal_length = 521;						//相机焦距, TUM dataset标定值
     Mat essential_matrix;
     essential_matrix = findEssentialMat ( points1, points2, focal_length, principal_point );
     cout << "essential_matrix is " << endl << essential_matrix << endl;
-
-	//Mat essential_matrix2 = findEssentialMat ( points1, points2, K );
-	//cout << "essential_matrix2 is " << endl << essential_matrix << endl;
+	*/
+	Mat essential_matrix = findEssentialMat ( points1, points2, K );
+	cout << "essential_matrix2 is " << endl << essential_matrix << endl;
 
 	
 	// -- F -> E
@@ -348,7 +356,8 @@ void pose_estimation_2d2d (
 
     //-- 从本质矩阵中恢复旋转和平移信息.
 
-	recoverPose ( essential_matrix, points1, points2, R, t, focal_length, principal_point );
+	//recoverPose ( essential_matrix, points1, points2, R, t, focal_length, principal_point );
+	recoverPose ( essential_matrix, points1, points2, K, R, t);
 	Mat r;
 	cv::Rodrigues ( R, r ); // r为旋转向量形式，用Rodrigues公式转换为矩阵
 
@@ -357,10 +366,11 @@ void pose_estimation_2d2d (
     cout << "t is " << endl << t << endl;
 }
 
-void triangulation (
+void triangulation (	
     const vector< KeyPoint >& keypoint_1,
     const vector< KeyPoint >& keypoint_2,
     const std::vector< DMatch >& matches,
+	const Mat K,
     const Mat& R, const Mat& t,
     vector< Point3d >& points )
 {
@@ -374,7 +384,7 @@ void triangulation (
         R.at<double> ( 2, 0 ), R.at<double> ( 2, 1 ), R.at<double> ( 2, 2 ), t.at<double> ( 2, 0 )
         );
 
-    Mat K = (Mat_<double> ( 3, 3 ) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
+    //Mat K = (Mat_<double> ( 3, 3 ) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
     vector<Point2f> pts_1, pts_2;
     for ( DMatch m : matches )
     {
@@ -438,10 +448,11 @@ void PNPSolver (
     const vector<KeyPoint>& keypoints_1,
     const vector<KeyPoint>& keypoints_2,
     const std::vector< DMatch >& matches,
-    const Mat& d1
+    const Mat& d1,
+	const Mat K
 )
 {
-    Mat K = (Mat_<double> ( 3, 3 ) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
+    //Mat K = (Mat_<double> ( 3, 3 ) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
     vector<Point3d> pts_3d;
     vector<Point2d> pts_2d;
     for ( DMatch m : matches )
