@@ -18,6 +18,7 @@
 #include <numeric>      // std::iota
 #include <random>       // std::default_random_engine
 #include <map> 
+#include <math.h>
 
 using namespace std;
 using namespace cv;
@@ -97,6 +98,22 @@ void essentialFromFundamental ( const Mat &F,
 
 // 像素坐标转相机归一化坐标
 Point2f pixel2cam ( const Point2d& p, const Mat& K );
+
+void rotate_angle ( Mat R )
+{
+	double r11 = R.at<double> ( 0, 0 ), r21 = R.at<double> ( 1, 0 ), r31 = R.at<double> ( 2, 0 ), r32 = R.at<double> ( 2, 1 ), r33 = R.at<double> ( 2, 2 );
+
+	//计算出相机坐标系的三轴旋转欧拉角，旋转后可以转出世界坐标系。
+	//旋转顺序为z、y、x
+
+	const double PI = 3.14159265358979323846;
+	double thetaz = atan2 ( r21, r11 ) / PI * 180;
+	double thetay = atan2 ( -1 * r31, sqrt ( r32*r32 + r33*r33 ) ) / PI * 180;
+	double thetax = atan2 ( r32, r33 ) / PI * 180;
+
+	cout << thetaz << " " << thetay << " " << thetax << endl;
+}
+
 
 int main ( int argc, char** argv )
 {
@@ -437,6 +454,7 @@ void triangulation (
 
 Point2f pixel2cam ( const Point2d& p, const Mat& K )
 {
+	//[1、像素坐标与像平面坐标系之间的关系 ](http://blog.csdn.net/waeceo/article/details/50580607)
     return Point2f
     (
         (p.x - K.at<double> ( 0, 2 )) / K.at<double> ( 0, 0 ),
