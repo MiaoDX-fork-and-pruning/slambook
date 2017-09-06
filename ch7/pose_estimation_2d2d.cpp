@@ -143,8 +143,8 @@ void pose_estimation_2d2d ( const std::vector<KeyPoint> keypoints_1,
     Mat K = ( Mat_<double> ( 3,3 ) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1 );
 
     //-- 把匹配点转换为vector<Point2f>的形式
-    vector<Point2f> points1;
-    vector<Point2f> points2;
+	vector<Point2f> points1;
+	vector<Point2f> points2;
 
     for ( int i = 0; i < ( int ) matches.size(); i++ )
     {

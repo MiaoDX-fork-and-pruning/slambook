@@ -3,19 +3,19 @@ project( vo1 )
 
 message(STATUS "In vo1 project:")
 
-#set( CMAKE_BUILD_TYPE "Release" )
-set( CMAKE_BUILD_TYPE "Debug" ) 
+set( CMAKE_TYPE "Release" )
+#set( CMAKE_TYPE "Debug" ) 
 
 if (WIN32)
 message(STATUS "Going to define _WINDOWS:")
 add_definitions(-D_WINDOWS) # `#ifdef _WINDOWS` in timeutil.h
 set( CMAKE_CXX_FLAGS "-std=c++11" )
-set( EIGEN_INCLUDE_DIR "C:/tools/eigen/" )
+set( EIGEN_INCLUDE_DIR "C:/tools/sfm_necessary/eigen_334" )
 else()
 set( CMAKE_CXX_FLAGS "-std=c++11 -O3" )
 set( EIGEN_INCLUDE_DIR "/usr/include/eigen3/" )
 endif()
-
+ 
 
 
 # 添加cmake模块以使用g2o
@@ -23,11 +23,13 @@ list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules )
 
 # find_package( OpenCV 3.1 REQUIRED )
 # find_package( OpenCV REQUIRED ) # use this if in OpenCV2 
-include( $ENV{OpenCV3_DIR}/OpenCVConfig.cmake ) # https://github.com/district10/cmake-templates/issues/4
+#include( $ENV{OpenCV3_DIR}/OpenCVConfig.cmake ) # https://github.com/district10/cmake-templates/issues/4
+include( $ENV{OpenCV3_DIR}/OpenCVConfig.cmake )
+
 find_package( G2O REQUIRED )
 #find_package( CSparse REQUIRED ) # Not necessary since there is `EXTERNAL` in g2o
 
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (${CMAKE_TYPE} STREQUAL "Debug")
 message(STATUS "Debug mode:")
 set(G2O_LIBS ${G2O_LIBS_DEBUG})
 else()
@@ -86,4 +88,7 @@ target_link_libraries( pose_estimation_3d3d
    #${CSPARSE_LIBRARY}
    ${G2O_LIBS}
 ) 
+
+add_executable( test test.cpp  )
+target_link_libraries( test ${OpenCV_LIBS} )
 

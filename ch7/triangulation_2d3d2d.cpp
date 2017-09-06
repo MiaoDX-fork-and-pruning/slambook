@@ -111,7 +111,7 @@ void rotate_angle ( Mat R )
 	double thetay = atan2 ( -1 * r31, sqrt ( r32*r32 + r33*r33 ) ) / PI * 180;
 	double thetax = atan2 ( r32, r33 ) / PI * 180;
 
-	cout << thetaz << " " << thetay << " " << thetax << endl;
+	cout << "thetaz:" << thetaz << " thetay:" << thetay << " thetax:" << thetax << endl;
 }
 
 
@@ -324,8 +324,8 @@ void pose_estimation_2d2d (
     //Mat K = (Mat_<double> ( 3, 3 ) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
 
     //-- 把匹配点转换为vector<Point2f>的形式
-    vector<Point2f> points1;
-    vector<Point2f> points2;
+	vector<Point2f> points1;
+	vector<Point2f> points2;
 
 
 	for ( auto m : matches )
@@ -346,7 +346,8 @@ void pose_estimation_2d2d (
 
     //-- 计算基础矩阵
     Mat fundamental_matrix;
-    fundamental_matrix = findFundamentalMat ( points1, points2, CV_FM_8POINT );
+    //fundamental_matrix = findFundamentalMat ( points1, points2, CV_FM_8POINT );
+	fundamental_matrix = findFundamentalMat ( points1, points2, CV_RANSAC, 0.1, 0.99 );
     cout << "fundamental_matrix is " << endl << fundamental_matrix << endl;
 
 	/*
@@ -380,6 +381,7 @@ void pose_estimation_2d2d (
 
 	cout << "R=" << endl << R << endl;
 	cout << "r=" << endl << r << endl;
+	rotate_angle ( R );
     cout << "t is " << endl << t << endl;
 }
 
@@ -461,6 +463,8 @@ Point2f pixel2cam ( const Point2d& p, const Mat& K )
         (p.y - K.at<double> ( 1, 2 )) / K.at<double> ( 1, 1 )
     );
 }
+
+
 
 void PNPSolver (
     const vector<KeyPoint>& keypoints_1,
