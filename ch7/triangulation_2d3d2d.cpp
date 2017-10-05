@@ -358,6 +358,15 @@ void pose_estimation_2d2d (
     essential_matrix = findEssentialMat ( points1, points2, focal_length, principal_point );
     cout << "essential_matrix is " << endl << essential_matrix << endl;
 	*/
+
+
+    Point2d principal_point ( K.at<double>(0,2), K.at<double>(1,2) );				//相机主点, TUM dataset标定值
+    int focal_length = K.at<double>(0,0);						//相机焦距, TUM dataset标定值
+    Mat essential_matrix_pp;
+    essential_matrix_pp = findEssentialMat ( points1, points2, focal_length, principal_point );
+    cout << "essential_matrix is " << endl << essential_matrix_pp << endl;
+
+
 	Mat essential_matrix = findEssentialMat ( points1, points2, K );
 	cout << "essential_matrix2 is " << endl << essential_matrix << endl;
 

@@ -34,6 +34,10 @@ void bundleAdjustment (
 
 int main ( int argc, char** argv )
 {
+
+    // ..\1.png ..\2.png ..\1_depth.png ..\2_depth.png
+    // H:/projects/graduation_project_codebase/ACR/dataset/nine_scene/1_000.png H:/projects/graduation_project_codebase/ACR/dataset/nine_scene/4_000.png H:/projects/graduation_project_codebase/ACR/dataset/nine_scene/1_000_depth.png H:/projects/graduation_project_codebase/ACR/dataset/nine_scene/4_000_depth.png
+
     if ( argc != 5 )
     {
         cout<<"usage: pose_estimation_3d2d img1 img2 depth1 depth2"<<endl;
@@ -49,9 +53,21 @@ int main ( int argc, char** argv )
     //cout<<"一共找到了"<<matches.size() <<"组匹配点"<<endl;
 	cout << "We found " << matches.size() << " pairs of points in total" << endl;
 
+
+    //Mat img_match;
+    //drawMatches ( img_1, keypoints_1, img_2, keypoints_2, matches, img_match );
+    //imshow ( "All matched points", img_match );
+    //waitKey ( 0 );
+
+
+
     // 建立3D点
     Mat d1 = imread ( argv[3], CV_LOAD_IMAGE_UNCHANGED );       // 深度图为16位无符号数，单通道图像
-    Mat K = ( Mat_<double> ( 3,3 ) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1 );
+    //Mat K = ( Mat_<double> ( 3,3 ) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1 );
+    Mat K = (Mat_<double> ( 3, 3 ) << 320, 0, 320, 0, 320, 240, 0, 0, 1);
+
+
+
     vector<Point3f> pts_3d;
     vector<Point2f> pts_2d;
     for ( DMatch m:matches )
@@ -67,8 +83,11 @@ int main ( int argc, char** argv )
 
     cout<<"3d-2d pairs: "<<pts_3d.size() <<endl;
 
+    //cout << "pts_3d:\n" << pts_3d << endl;
+
     Mat r, t;
-    solvePnP ( pts_3d, pts_2d, K, Mat(), r, t, false ); // 调用OpenCV 的 PnP 求解，可选择EPNP，DLS等方法
+    //solvePnP ( pts_3d, pts_2d, K, Mat(), r, t, false ); // 调用OpenCV 的 PnP 求解，可选择EPNP，DLS等方法
+    solvePnPRansac ( pts_3d, pts_2d, K, Mat (), r, t, false );
     Mat R;
     cv::Rodrigues ( r, R ); // r为旋转向量形式，用Rodrigues公式转换为矩阵
 
@@ -79,7 +98,7 @@ int main ( int argc, char** argv )
 
     bundleAdjustment ( pts_3d, pts_2d, K, R, t );
 
-	system("pause");
+	//system("pause");
 }
 
 void find_feature_matches ( const Mat& img_1, const Mat& img_2,
@@ -90,8 +109,8 @@ void find_feature_matches ( const Mat& img_1, const Mat& img_2,
     //-- 初始化
     Mat descriptors_1, descriptors_2;
     // used in OpenCV3
-    Ptr<FeatureDetector> detector = ORB::create();
-    Ptr<DescriptorExtractor> descriptor = ORB::create();
+    Ptr<FeatureDetector> detector = ORB::create( 2000 );
+    Ptr<DescriptorExtractor> descriptor = ORB::create( 2000 );
     // use this if you are in OpenCV2
     // Ptr<FeatureDetector> detector = FeatureDetector::create ( "ORB" );
     // Ptr<DescriptorExtractor> descriptor = DescriptorExtractor::create ( "ORB" );

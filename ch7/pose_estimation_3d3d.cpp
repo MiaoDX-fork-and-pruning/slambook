@@ -108,7 +108,10 @@ int main ( int argc, char** argv )
     // 建立3D点
     Mat depth1 = imread ( argv[3], CV_LOAD_IMAGE_UNCHANGED );       // 深度图为16位无符号数，单通道图像
     Mat depth2 = imread ( argv[4], CV_LOAD_IMAGE_UNCHANGED );       // 深度图为16位无符号数，单通道图像
-    Mat K = ( Mat_<double> ( 3,3 ) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1 );
+    //Mat K = ( Mat_<double> ( 3,3 ) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1 );
+    //Mat K = (Mat_<double> ( 3, 3 ) << 700, 0, 636, 0, 700, 354, 0, 0, 1);
+    Mat K = (Mat_<double> ( 3, 3 ) << 320, 0, 320, 0, 320, 240, 0, 0, 1);
+
     vector<Point3f> pts1, pts2;
 
     for ( DMatch m:matches )
@@ -126,6 +129,9 @@ int main ( int argc, char** argv )
     }
 
     cout<<"3d-3d pairs: "<<pts1.size() <<endl;
+    //cout << "pts1:\n" << pts1 << endl;
+    //cout << "pts2:\n" << pts2 << endl;
+
     Mat R, t;
     pose_estimation_3d3d ( pts1, pts2, R, t );
     cout<<"ICP via SVD results: "<<endl;
@@ -158,8 +164,10 @@ void find_feature_matches ( const Mat& img_1, const Mat& img_2,
     //-- 初始化
     Mat descriptors_1, descriptors_2;
     // used in OpenCV3 
-    Ptr<FeatureDetector> detector = ORB::create();
-    Ptr<DescriptorExtractor> descriptor = ORB::create();
+    //Ptr<FeatureDetector> detector = ORB::create();
+    //Ptr<DescriptorExtractor> descriptor = ORB::create();
+    Ptr<FeatureDetector> detector = ORB::create ( 2000 );
+    Ptr<DescriptorExtractor> descriptor = ORB::create ( 2000 );
     // use this if you are in OpenCV2 
     // Ptr<FeatureDetector> detector = FeatureDetector::create ( "ORB" );
     // Ptr<DescriptorExtractor> descriptor = DescriptorExtractor::create ( "ORB" );
